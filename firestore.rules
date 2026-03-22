@@ -1,0 +1,171 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (from Firebase Auth)
+    // Fields:
+    //   - email: string (required)
+    //   - role: string (enum: 'root', 'sub-admin') (required)
+    //   - createdAt: string (ISO 8601 date string)
+    //
+    // Collection: settings
+    // Document ID: 'general'
+    // Fields:
+    //   - brandName: string (required)
+    //   - hotline: string
+    //   - zalo: string
+    //   - title: string
+    //   - favicon: string
+    //   - logo: string
+    //   - heroTitle: map
+    //   - heroSubtitle: map
+    //   - heroImages: list
+    //
+    // Collection: languages
+    // Document ID: langId
+    // Fields:
+    //   - code: string (required)
+    //   - name: string (required)
+    //   - isDefault: boolean (required)
+    //
+    // Collection: projects
+    // Document ID: projectId
+    // Fields:
+    //   - title: map (required)
+    //   - description: map
+    //   - location: map
+    //   - price: number (required)
+    //   - area: number (required)
+    //   - type: string (required)
+    //   - images: list
+    //   - createdAt: string (required)
+    //   - createdBy: string (required)
+    //
+    // Collection: fonts
+    // Document ID: fontId
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - url: string (required)
+    //   - format: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.token.email == userId;
+    }
+
+    function isRoot() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == 'root' ||
+        (request.auth.token.email == "vin.oit99@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isSubAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == 'sub-admin';
+    }
+
+    function hasAdminAccess() {
+      return isRoot() || isSubAdmin();
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser() {
+      return hasRequiredFields(['email', 'role']) &&
+             request.resource.data.email is string &&
+             request.resource.data.role in ['root', 'sub-admin'];
+    }
+
+    function isValidSettings() {
+      return hasRequiredFields(['brandName']) &&
+             request.resource.data.brandName is string;
+    }
+
+    function isValidLanguage() {
+      return hasRequiredFields(['code', 'name', 'isDefault']) &&
+             request.resource.data.code is string &&
+             request.resource.data.name is string &&
+             request.resource.data.isDefault is bool;
+    }
+
+    function isValidProject() {
+      return hasRequiredFields(['title', 'price', 'area', 'type', 'createdAt', 'createdBy']) &&
+             request.resource.data.title is map &&
+             request.resource.data.price is number &&
+             request.resource.data.area is number &&
+             request.resource.data.type is string &&
+             isValidDateString(request.resource.data.createdAt) &&
+             request.resource.data.createdBy is string;
+    }
+
+    function isValidFont() {
+      return hasRequiredFields(['id', 'name', 'url', 'format']) &&
+             request.resource.data.id is string &&
+             request.resource.data.name is string &&
+             request.resource.data.url is string &&
+             request.resource.data.format is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isRoot();
+      allow create: if isRoot() && isValidUser();
+      allow update: if isRoot() && isValidUser();
+      allow delete: if isRoot();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create: if isRoot() && isValidSettings();
+      allow update: if isRoot() && isValidSettings();
+      allow delete: if isRoot();
+    }
+
+    match /languages/{langId} {
+      allow read: if true;
+      allow create: if isRoot() && isValidLanguage();
+      allow update: if isRoot() && isValidLanguage();
+      allow delete: if isRoot();
+    }
+
+    match /projects/{projectId} {
+      allow read: if true;
+      allow create: if hasAdminAccess() && isValidProject();
+      allow update: if hasAdminAccess() && isValidProject();
+      allow delete: if hasAdminAccess();
+    }
+
+    match /fonts/{fontId} {
+      allow read: if true;
+      allow create: if isRoot() && isValidFont();
+      allow update: if isRoot() && isValidFont();
+      allow delete: if isRoot();
+    }
+  }
+}
