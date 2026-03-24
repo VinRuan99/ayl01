@@ -2,31 +2,33 @@ import imageCompression from 'browser-image-compression';
 
 export const uploadImage = async (file: File, path: string = 'projects'): Promise<string> => {
   try {
-    // Compress image heavily to avoid Firestore 1MB document limit
+    // Nén ảnh trước khi upload
     const options = {
-      maxSizeMB: 0.05, // Max 50KB
-      maxWidthOrHeight: 800,
-      useWebWorker: false, // Disable web worker to prevent hanging in iframe
-      initialQuality: 0.6,
+      maxSizeMB: 1.5,
+      maxWidthOrHeight: 1920,
+      useWebWorker: false,
+      initialQuality: 0.9,
     };
     
     const compressedFile = await imageCompression(file, options);
     
-    // Convert to Base64
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(compressedFile);
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
-        resolve(base64data);
-      };
-      reader.onerror = (error) => {
-        console.error("Error converting image to Base64:", error);
-        reject(error);
-      };
+    // Gửi ảnh lên server local
+    const formData = new FormData();
+    formData.append('image', compressedFile, file.name);
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
     });
+
+    if (!response.ok) {
+      throw new Error('Upload failed');
+    }
+
+    const data = await response.json();
+    return data.url;
   } catch (error) {
-    console.error("Error processing image:", error);
+    console.error("Error uploading image to local server:", error);
     throw error;
   }
 };

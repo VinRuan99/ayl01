@@ -15,6 +15,9 @@ interface Project {
   area: number;
   type: string;
   images: string[];
+  createdAt: string;
+  createdBy: string;
+  order?: number;
 }
 
 export default function Home() {
@@ -23,9 +26,15 @@ export default function Home() {
 
   useEffect(() => {
     const fetchProjects = async () => {
-      const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, 'projects'));
       const snap = await getDocs(q);
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      data.sort((a, b) => {
+        const orderA = a.order ?? -1;
+        const orderB = b.order ?? -1;
+        if (orderA !== orderB) return orderA - orderB;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
       setProjects(data);
     };
     fetchProjects();
@@ -171,34 +180,47 @@ export default function Home() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-              {projects.map((project) => (
-                <Link key={project.id} to={`/projects/${project.id}`} className="group block">
-                  <div className="relative rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 aspect-[4/3]">
-                    <img
-                      src={project.images?.[0] || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80'}
-                      alt={getLocalizedText(project.title)}
-                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/20 to-transparent opacity-80"></div>
-                    <div className="absolute bottom-0 left-0 right-0 p-6">
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="px-3 py-1 bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-full">
-                          {project.type}
-                        </span>
-                      </div>
-                      <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">
-                        {getLocalizedText(project.title)}
-                      </h3>
-                      <div className="flex items-center text-gray-300 text-sm">
-                        <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                        <span className="line-clamp-1">{getLocalizedText(project.location)}</span>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                {projects.slice(0, 3).map((project) => (
+                  <Link key={project.id} to={`/projects/${project.id}`} className="group block">
+                    <div className="relative rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 aspect-[4/3]">
+                      <img
+                        src={project.images?.[0] || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80'}
+                        alt={getLocalizedText(project.title)}
+                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/20 to-transparent opacity-80"></div>
+                      <div className="absolute bottom-0 left-0 right-0 p-6">
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="px-3 py-1 bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-full">
+                            {project.type}
+                          </span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">
+                          {getLocalizedText(project.title)}
+                        </h3>
+                        <div className="flex items-center text-gray-300 text-sm">
+                          <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+                          <span className="line-clamp-1">{getLocalizedText(project.location)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                  </Link>
+                ))}
+              </div>
+              {projects.length > 3 && (
+                <div className="mt-12 text-center">
+                  <Link
+                    to="/projects"
+                    className="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-medium rounded-full text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:text-indigo-300 dark:bg-indigo-900/50 dark:hover:bg-indigo-900/80 transition-colors"
+                  >
+                    {currentLanguage === 'vi' ? 'Xem thêm tất cả dự án' : 'View all projects'}
+                    <ArrowRight className="ml-2 w-5 h-5" />
+                  </Link>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

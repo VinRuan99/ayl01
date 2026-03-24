@@ -8,6 +8,7 @@ export default function Login() {
   const { user, settings } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const [messageAlert, setMessageAlert] = React.useState<{title: string, message: string} | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -18,18 +19,10 @@ export default function Login() {
 
   const handleLogin = async () => {
     try {
-      console.log('🔐 Starting Google Sign-in...');
       await loginWithGoogle();
-      console.log('✅ Login successful');
     } catch (error) {
-      console.error('❌ Login failed:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error code:', (error as any).code);
-        alert(`Đăng nhập thất bại: ${error.message}`);
-      } else {
-        alert('Đăng nhập thất bại. Vui lòng thử lại.');
-      }
+      console.error('Login failed', error);
+      setMessageAlert({ title: 'Lỗi', message: 'Đăng nhập thất bại. Vui lòng thử lại.' });
     }
   };
 
@@ -63,6 +56,24 @@ export default function Login() {
           </button>
         </div>
       </div>
+
+      {/* Alert Modal */}
+      {messageAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">{messageAlert.title}</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">{messageAlert.message}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setMessageAlert(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

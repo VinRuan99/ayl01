@@ -1,16 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useStore } from '../../store/useStore';
-import { Plus, Edit, Trash2, Globe, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Globe, X, GripVertical, CheckCircle } from 'lucide-react';
 import { translateText } from '../../lib/translate';
 import BlockEditor from '../../components/BlockEditor';
 import BlockRenderer from '../../components/BlockRenderer';
 import { Project, ContentBlock } from '../../types';
 import { uploadImage } from '../../lib/storage';
 
+const OrderInput = ({ index, projectId, onReorder, max }: { index: number, projectId: string, onReorder: (id: string, pos: number) => void, max: number }) => {
+  const [value, setValue] = useState((index + 1).toString());
+
+  useEffect(() => {
+    setValue((index + 1).toString());
+  }, [index]);
+
+  return (
+    <input
+      type="number"
+      min="1"
+      max={max}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          const newPos = parseInt(value, 10);
+          if (!isNaN(newPos) && newPos !== index + 1) {
+            onReorder(projectId, newPos);
+          }
+        }
+      }}
+      onBlur={() => setValue((index + 1).toString())}
+      className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 text-center"
+    />
+  );
+};
+
 export default function AdminProjects() {
-  const { user, languages } = useStore();
+  const { user, languages, showAdminNotification } = useStore();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [currentProject, setCurrentProject] = useState<Partial<Project>>({});
@@ -18,11 +46,20 @@ export default function AdminProjects() {
   const [translating, setTranslating] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('vi'); // Default to Vietnamese tab
+  const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [messageAlert, setMessageAlert] = useState<{title: string, message: string} | null>(null);
 
   const fetchProjects = async () => {
-    const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'projects'));
     const snap = await getDocs(q);
     const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+    data.sort((a, b) => {
+      const orderA = a.order ?? -1;
+      const orderB = b.order ?? -1;
+      if (orderA !== orderB) return orderA - orderB;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
     setProjects(data);
   };
 
@@ -50,10 +87,16 @@ export default function AdminProjects() {
     setActiveTab('vi');
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa dự án này?')) {
-      await deleteDoc(doc(db, 'projects', id));
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirmId) {
+      await deleteDoc(doc(db, 'projects', deleteConfirmId));
+      showAdminNotification('Đã xóa dự án thành công', 'delete');
       fetchProjects();
+      setDeleteConfirmId(null);
     }
   };
 
@@ -64,15 +107,47 @@ export default function AdminProjects() {
       const projectId = currentProject.id || `proj_${Date.now()}`;
       const projectData = {
         ...currentProject,
+        id: projectId,
         createdAt: currentProject.createdAt || new Date().toISOString(),
-        createdBy: currentProject.createdBy || user?.email,
+        createdBy: currentProject.createdBy || user?.email || 'admin',
+        order: currentProject.order ?? -1,
       };
-      await setDoc(doc(db, 'projects', projectId), projectData);
+      
+      // Hàm đệ quy để loại bỏ tất cả các giá trị undefined ở mọi cấp độ (nested)
+      const removeUndefined = (obj: any): any => {
+        if (Array.isArray(obj)) {
+          return obj.map(removeUndefined).filter(item => item !== undefined);
+        } else if (obj !== null && typeof obj === 'object') {
+          return Object.keys(obj).reduce((acc, key) => {
+            if (obj[key] !== undefined) {
+              acc[key] = removeUndefined(obj[key]);
+            }
+            return acc;
+          }, {} as any);
+        }
+        return obj;
+      };
+
+      const cleanProjectData = removeUndefined(projectData);
+
+      // Kiểm tra dung lượng trước khi lưu (Firestore limit là 1MB = 1,048,576 bytes)
+      const dataString = JSON.stringify(cleanProjectData);
+      const sizeInBytes = new Blob([dataString]).size;
+      const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
+      
+      if (sizeInBytes > 800000) { // Cảnh báo ở mức ~800KB
+        setMessageAlert({ title: 'Lưu thất bại', message: `Dung lượng dự án quá lớn (${sizeInMB}MB). Giới hạn an toàn của cơ sở dữ liệu là ~0.8MB. Vui lòng xóa bớt ảnh hoặc sử dụng ảnh có dung lượng nhỏ hơn (hoặc dùng link URL).` });
+        setLoading(false);
+        return;
+      }
+
+      await setDoc(doc(db, 'projects', projectId), cleanProjectData);
+      showAdminNotification(currentProject.id ? 'Đã cập nhật dự án thành công' : 'Đã tạo dự án thành công', currentProject.id ? 'update' : 'create');
       setIsEditing(false);
       fetchProjects();
     } catch (error) {
       console.error('Error saving project', error);
-      alert('Lưu thất bại.');
+      setMessageAlert({ title: 'Lỗi', message: 'Lưu thất bại. Vui lòng kiểm tra console để xem chi tiết lỗi.' });
     } finally {
       setLoading(false);
     }
@@ -80,7 +155,7 @@ export default function AdminProjects() {
 
   const handleTranslate = async (targetLangCode: string) => {
     if (!currentProject.title?.['vi']) {
-      alert('Vui lòng nhập nội dung Tiếng Việt trước khi dịch!');
+      setMessageAlert({ title: 'Thông báo', message: 'Vui lòng nhập nội dung Tiếng Việt trước khi dịch!' });
       return;
     }
     setTranslating(true);
@@ -90,20 +165,39 @@ export default function AdminProjects() {
       const translatedTitle = await translateText(currentProject.title['vi'], targetLangName);
       const translatedLoc = currentProject.location?.['vi'] ? await translateText(currentProject.location['vi'], targetLangName) : '';
 
-      // We don't auto-translate blocks yet as it's complex, just copy or leave empty
       const viDesc = currentProject.description?.['vi'];
+      let translatedDesc: string | ContentBlock[] = '';
+      
+      if (typeof viDesc === 'string') {
+        translatedDesc = await translateText(viDesc, targetLangName);
+      } else if (Array.isArray(viDesc)) {
+        translatedDesc = await Promise.all(viDesc.map(async (block) => {
+          if (block.type === 'rich-text') {
+            return {
+              ...block,
+              content: await translateText(block.content, targetLangName)
+            };
+          } else if (block.type === 'image-text') {
+            return {
+              ...block,
+              text: await translateText(block.text, targetLangName)
+            };
+          }
+          return block;
+        }));
+      }
       
       setCurrentProject(prev => ({
         ...prev,
         title: { ...prev.title, [targetLangCode]: translatedTitle },
         location: { ...prev.location, [targetLangCode]: translatedLoc },
-        description: { ...prev.description, [targetLangCode]: viDesc } // Copy blocks for now
+        description: { ...prev.description, [targetLangCode]: translatedDesc }
       }));
       
-      alert(`Đã dịch tự động sang ${targetLangName}. Bạn có thể chỉnh sửa lại nếu cần.`);
+      setMessageAlert({ title: 'Thành công', message: `Đã dịch tự động sang ${targetLangName}. Bạn có thể chỉnh sửa lại nếu cần.` });
     } catch (error) {
       console.error('Translation error', error);
-      alert('Lỗi dịch tự động.');
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi dịch tự động.' });
     } finally {
       setTranslating(false);
     }
@@ -126,10 +220,42 @@ export default function AdminProjects() {
         images: [...(prev.images || []), ...newImages]
       }));
     } catch (error) {
-      alert('Lỗi tải ảnh lên');
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải ảnh lên' });
     } finally {
       setLoading(false);
       e.target.value = '';
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+
+    setLoading(true);
+    try {
+      const newImages: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type.startsWith('image/')) {
+          const url = await uploadImage(files[i]);
+          newImages.push(url);
+        }
+      }
+      
+      setCurrentProject(prev => ({
+        ...prev,
+        images: [...(prev.images || []), ...newImages]
+      }));
+    } catch (error) {
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải ảnh lên' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -138,6 +264,77 @@ export default function AdminProjects() {
       ...prev,
       images: prev.images?.filter((_, i) => i !== index) || []
     }));
+  };
+
+  const handleDragStartRow = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
+    setDraggedProjectId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOverRow = (e: React.DragEvent<HTMLTableRowElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const updateProjectsOrder = async (updatedProjects: Project[]) => {
+    setProjects(updatedProjects);
+    try {
+      const chunkSize = 500;
+      for (let i = 0; i < updatedProjects.length; i += chunkSize) {
+        const chunk = updatedProjects.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach(p => {
+          const docRef = doc(db, 'projects', p.id);
+          batch.set(docRef, { order: p.order }, { merge: true });
+        });
+        await batch.commit();
+      }
+      showAdminNotification('Đã chuyển vị trí thành công', 'reorder');
+    } catch (error) {
+      console.error('Error updating order', error);
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi khi cập nhật thứ tự' });
+      fetchProjects();
+    }
+  };
+
+  const handleManualReorder = async (projectId: string, newPosition: number) => {
+    const targetIndex = Math.max(0, Math.min(projects.length - 1, newPosition - 1));
+    const draggedIndex = projects.findIndex(p => p.id === projectId);
+    
+    if (draggedIndex === -1 || targetIndex === draggedIndex) return;
+
+    const newProjects = [...projects];
+    const [draggedProject] = newProjects.splice(draggedIndex, 1);
+    newProjects.splice(targetIndex, 0, draggedProject);
+
+    const updatedProjects = newProjects.map((p, index) => ({
+      ...p,
+      order: index
+    }));
+
+    await updateProjectsOrder(updatedProjects);
+  };
+
+  const handleDropRow = async (e: React.DragEvent<HTMLTableRowElement>, targetId: string) => {
+    e.preventDefault();
+    if (!draggedProjectId || draggedProjectId === targetId) return;
+
+    const draggedIndex = projects.findIndex(p => p.id === draggedProjectId);
+    const targetIndex = projects.findIndex(p => p.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newProjects = [...projects];
+    const [draggedProject] = newProjects.splice(draggedIndex, 1);
+    newProjects.splice(targetIndex, 0, draggedProject);
+
+    const updatedProjects = newProjects.map((p, index) => ({
+      ...p,
+      order: index
+    }));
+
+    setDraggedProjectId(null);
+    await updateProjectsOrder(updatedProjects);
   };
 
   const formatPrice = (price: number) => {
@@ -223,37 +420,57 @@ export default function AdminProjects() {
             <div className="md:col-span-3">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Hình ảnh dự án</label>
               <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="block w-full text-sm text-gray-500 dark:text-gray-400
-                      file:mr-4 file:py-2 file:px-4
-                      file:rounded-md file:border-0
-                      file:text-sm file:font-medium
-                      file:bg-indigo-50 file:text-indigo-700
-                      dark:file:bg-indigo-900/30 dark:file:text-indigo-400
-                      hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/50
-                      transition-colors cursor-pointer"
-                  />
+                <div 
+                  className="flex flex-col sm:flex-row items-center gap-4 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  onDragOver={handleDragOver}
+                  onDrop={handleImageDrop}
+                >
+                  <label className="flex-shrink-0 cursor-pointer">
+                    <span className="px-4 py-2 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors inline-block">
+                      {loading ? 'Đang tải...' : 'Chọn ảnh hoặc Kéo thả vào đây'}
+                    </span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={loading}
+                    />
+                  </label>
                   <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">hoặc nhập URL:</span>
-                  <input
-                    type="text"
-                    placeholder="https://example.com/image.jpg"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const url = e.currentTarget.value.trim();
+                  <div className="flex w-full gap-2">
+                    <input
+                      type="text"
+                      id="imageUrlInput"
+                      placeholder="https://example.com/image.jpg"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const url = e.currentTarget.value.trim();
+                          if (url) {
+                            setCurrentProject(prev => ({ ...prev, images: [...(prev.images || []), url] }));
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
+                      className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('imageUrlInput') as HTMLInputElement;
+                        const url = input?.value.trim();
                         if (url) {
                           setCurrentProject(prev => ({ ...prev, images: [...(prev.images || []), url] }));
-                          e.currentTarget.value = '';
+                          if (input) input.value = '';
                         }
-                      }
-                    }}
-                    className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-                  />
+                      }}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
+                    >
+                      Thêm URL
+                    </button>
+                  </div>
                 </div>
                 
                 {currentProject.images && currentProject.images.length > 0 && (
@@ -403,6 +620,12 @@ export default function AdminProjects() {
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
+              <th scope="col" className="w-10 px-6 py-3">
+                <span className="sr-only">Kéo thả</span>
+              </th>
+              <th scope="col" className="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Thứ tự
+              </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Dự án
               </th>
@@ -421,8 +644,26 @@ export default function AdminProjects() {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {projects.map((project) => (
-              <tr key={project.id}>
+            {projects.map((project, index) => (
+              <tr 
+                key={project.id}
+                draggable
+                onDragStart={(e) => handleDragStartRow(e, project.id)}
+                onDragOver={handleDragOverRow}
+                onDrop={(e) => handleDropRow(e, project.id)}
+                className={`${draggedProjectId === project.id ? 'opacity-50 bg-gray-50 dark:bg-gray-700/50' : ''} hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}
+              >
+                <td className="px-6 py-4 whitespace-nowrap cursor-move text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                  <GripVertical className="w-5 h-5" />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <OrderInput 
+                    index={index} 
+                    projectId={project.id} 
+                    onReorder={handleManualReorder} 
+                    max={projects.length} 
+                  />
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="h-10 w-10 flex-shrink-0">
@@ -466,6 +707,48 @@ export default function AdminProjects() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Xác nhận xóa</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">Bạn có chắc chắn muốn xóa dự án này? Hành động này không thể hoàn tác.</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {messageAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">{messageAlert.title}</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">{messageAlert.message}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setMessageAlert(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

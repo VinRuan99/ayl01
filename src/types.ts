@@ -41,4 +41,5 @@ export interface Project {
   images: string[];
   createdAt: string;
   createdBy: string;
+  order?: number;
 }

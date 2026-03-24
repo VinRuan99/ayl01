@@ -75,6 +75,49 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     }
   };
 
+  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLLabelElement>, callback: (url: string) => void) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    setLoading(true);
+    try {
+      const url = await uploadImage(file);
+      callback(url);
+    } catch (error) {
+      alert('Lỗi tải ảnh lên');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMultipleDrop = async (e: React.DragEvent<HTMLLabelElement>, callback: (urls: string[]) => void) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    setLoading(true);
+    try {
+      const urls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type.startsWith('image/')) {
+          const url = await uploadImage(files[i]);
+          urls.push(url);
+        }
+      }
+      callback(urls);
+    } catch (error) {
+      alert('Lỗi tải ảnh lên');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {blocks.map((block, index) => (
@@ -122,13 +165,36 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
                   </div>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-2 text-gray-500" />
-                    <p className="text-sm text-gray-500">{loading ? 'Đang tải lên...' : 'Tải ảnh lên'}</p>
+                <div className="flex flex-col gap-2">
+                  <label 
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, (url) => updateBlock(block.id, { imageUrl: url }))}
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-2 text-gray-500" />
+                      <p className="text-sm text-gray-500">{loading ? 'Đang tải lên...' : 'Kéo thả hoặc bấm để tải ảnh lên'}</p>
+                    </div>
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, (url) => updateBlock(block.id, { imageUrl: url }))} disabled={loading} />
+                  </label>
+                  <div className="flex w-full gap-2 mt-2">
+                    <input
+                      type="text"
+                      placeholder="Hoặc nhập link ảnh (URL)..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const url = e.currentTarget.value.trim();
+                          if (url) {
+                            updateBlock(block.id, { imageUrl: url });
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
+                      className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                    />
                   </div>
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, (url) => updateBlock(block.id, { imageUrl: url }))} disabled={loading} />
-                </label>
+                </div>
               )}
             </div>
           )}
@@ -144,13 +210,34 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
                     </button>
                   </div>
                 ))}
-                <label className="flex flex-col items-center justify-center aspect-[4/3] border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600">
-                  <div className="flex flex-col items-center justify-center">
-                    <Plus className="w-6 h-6 text-gray-500" />
-                    <span className="text-xs text-gray-500 mt-1">{loading ? 'Đang tải...' : 'Thêm ảnh'}</span>
-                  </div>
-                  <input type="file" multiple className="hidden" accept="image/*" onChange={(e) => handleMultipleImageUpload(e, (urls) => updateBlock(block.id, { imageUrls: [...block.imageUrls, ...urls] }))} disabled={loading} />
-                </label>
+                <div className="flex flex-col gap-2">
+                  <label 
+                    className="flex flex-col items-center justify-center aspect-[4/3] border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleMultipleDrop(e, (urls) => updateBlock(block.id, { imageUrls: [...block.imageUrls, ...urls] }))}
+                  >
+                    <div className="flex flex-col items-center justify-center text-center p-2">
+                      <Plus className="w-6 h-6 text-gray-500 mx-auto" />
+                      <span className="text-xs text-gray-500 mt-1">{loading ? 'Đang tải...' : 'Kéo thả hoặc bấm thêm ảnh'}</span>
+                    </div>
+                    <input type="file" multiple className="hidden" accept="image/*" onChange={(e) => handleMultipleImageUpload(e, (urls) => updateBlock(block.id, { imageUrls: [...block.imageUrls, ...urls] }))} disabled={loading} />
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Nhập link ảnh (URL)..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const url = e.currentTarget.value.trim();
+                        if (url) {
+                          updateBlock(block.id, { imageUrls: [...block.imageUrls, url] });
+                          e.currentTarget.value = '';
+                        }
+                      }
+                    }}
+                    className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs dark:bg-gray-700 dark:text-white px-2 py-1 border"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -171,13 +258,36 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
                       </button>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600">
-                      <div className="flex flex-col items-center justify-center">
-                        <Upload className="w-8 h-8 mb-2 text-gray-500" />
-                        <p className="text-sm text-gray-500">{loading ? 'Đang tải lên...' : 'Tải ảnh lên'}</p>
+                    <div className="flex flex-col gap-2">
+                      <label 
+                        className="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, (url) => updateBlock(block.id, { imageUrl: url }))}
+                      >
+                        <div className="flex flex-col items-center justify-center">
+                          <Upload className="w-8 h-8 mb-2 text-gray-500" />
+                          <p className="text-sm text-gray-500">{loading ? 'Đang tải lên...' : 'Kéo thả hoặc bấm để tải ảnh lên'}</p>
+                        </div>
+                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, (url) => updateBlock(block.id, { imageUrl: url }))} disabled={loading} />
+                      </label>
+                      <div className="flex w-full gap-2 mt-2">
+                        <input
+                          type="text"
+                          placeholder="Hoặc nhập link ảnh (URL)..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const url = e.currentTarget.value.trim();
+                              if (url) {
+                                updateBlock(block.id, { imageUrl: url });
+                                e.currentTarget.value = '';
+                              }
+                            }
+                          }}
+                          className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                        />
                       </div>
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, (url) => updateBlock(block.id, { imageUrl: url }))} disabled={loading} />
-                    </label>
+                    </div>
                   )}
                 </div>
                 <div className="w-full md:w-1/2">

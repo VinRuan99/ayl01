@@ -16,6 +16,8 @@ export default function AdminUsers() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<string | null>(null);
+  const [messageAlert, setMessageAlert] = useState<{title: string, message: string} | null>(null);
 
   const fetchUsers = async () => {
     const snap = await getDocs(collection(db, 'users'));
@@ -51,27 +53,32 @@ export default function AdminUsers() {
       });
       setNewEmail('');
       fetchUsers();
-      alert('Thêm tài khoản thành công!');
+      setMessageAlert({ title: 'Thành công', message: 'Thêm tài khoản thành công!' });
     } catch (error) {
       console.error('Error adding user', error);
-      alert('Thêm thất bại.');
+      setMessageAlert({ title: 'Lỗi', message: 'Thêm thất bại.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string, role: string) => {
+  const handleDelete = (id: string, role: string) => {
     if (role === 'root') {
-      alert('Không thể xóa tài khoản Root!');
+      setMessageAlert({ title: 'Cảnh báo', message: 'Không thể xóa tài khoản Root!' });
       return;
     }
-    if (window.confirm('Bạn có chắc chắn muốn xóa tài khoản này?')) {
+    setDeleteConfirmUser(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirmUser) {
       try {
-        await deleteDoc(doc(db, 'users', id));
+        await deleteDoc(doc(db, 'users', deleteConfirmUser));
         fetchUsers();
+        setDeleteConfirmUser(null);
       } catch (error) {
         console.error('Error deleting user', error);
-        alert('Xóa thất bại.');
+        setMessageAlert({ title: 'Lỗi', message: 'Xóa thất bại.' });
       }
     }
   };
@@ -154,6 +161,48 @@ export default function AdminUsers() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Xác nhận xóa</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">Bạn có chắc chắn muốn xóa tài khoản này? Hành động này không thể hoàn tác.</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmUser(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {messageAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">{messageAlert.title}</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">{messageAlert.message}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setMessageAlert(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

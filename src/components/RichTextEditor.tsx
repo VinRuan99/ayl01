@@ -267,6 +267,28 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[200px] p-4 dark:prose-invert max-w-none',
       },
+      handleDrop: function(view, event, slice, moved) {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]) {
+          const file = event.dataTransfer.files[0];
+          if (file.type.startsWith('image/')) {
+            event.preventDefault();
+            import('../lib/storage').then(({ uploadImage }) => {
+              uploadImage(file).then((base64) => {
+                const { schema } = view.state;
+                const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                const node = schema.nodes.image.create({ src: base64 });
+                const transaction = view.state.tr.insert(coordinates?.pos || 0, node);
+                view.dispatch(transaction);
+              }).catch(err => {
+                console.error("Error adding dropped image to editor:", err);
+                alert("Lỗi tải ảnh lên.");
+              });
+            });
+            return true;
+          }
+        }
+        return false;
+      }
     },
   });
 

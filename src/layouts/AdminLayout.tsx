@@ -3,6 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { logout } from '../lib/firebase';
 import { LayoutDashboard, Settings, Users, Globe, Building2, LogOut, Moon, Sun } from 'lucide-react';
+import AdminNotification from '../components/AdminNotification';
 
 export default function AdminLayout() {
   const { user, theme, toggleTheme, settings } = useStore();
@@ -24,6 +25,7 @@ export default function AdminLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+      <AdminNotification />
       {/* Sidebar */}
       <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
         <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-700">

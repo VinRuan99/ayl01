@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { FirebaseProvider } from './components/FirebaseProvider';
 import { useStore } from './store/useStore';
 import PublicLayout from './layouts/PublicLayout';
 import AdminLayout from './layouts/AdminLayout';
 import Home from './pages/Home';
+import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminSettings from './pages/admin/AdminSettings';
@@ -30,14 +31,23 @@ const ProtectedRoute = ({ children, requireRoot = false }: { children: React.Rea
 export default function App() {
   const { theme } = useStore();
 
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
       <FirebaseProvider>
         <Router>
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<PublicLayout />}>
               <Route index element={<Home />} />
+              <Route path="projects" element={<Projects />} />
               <Route path="projects/:id" element={<ProjectDetail />} />
             </Route>
 

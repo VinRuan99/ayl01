@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useStore, Settings } from '../../store/useStore';
-import { Save, Globe, Upload, Trash2 } from 'lucide-react';
+import { Save, Globe, Upload, Trash2, CheckCircle } from 'lucide-react';
 import { translateText } from '../../lib/translate';
 import { CustomFont, loadCustomFonts, uploadCustomFont, deleteCustomFont } from '../../lib/fonts';
+import { uploadImage } from '../../lib/storage';
 
 export default function AdminSettings() {
   const { settings, languages } = useStore();
@@ -13,6 +14,11 @@ export default function AdminSettings() {
   const [translating, setTranslating] = useState(false);
   const [fonts, setFonts] = useState<CustomFont[]>([]);
   const [uploadingFont, setUploadingFont] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
+  const [deleteConfirmFont, setDeleteConfirmFont] = useState<CustomFont | null>(null);
+  const [messageAlert, setMessageAlert] = useState<{title: string, message: string} | null>(null);
+  const [previewAction, setPreviewAction] = useState<'create' | 'update' | 'delete' | 'reorder'>('create');
 
   useEffect(() => {
     if (settings) {
@@ -35,24 +41,125 @@ export default function AdminSettings() {
     try {
       const newFont = await uploadCustomFont(file, name);
       setFonts(prev => [...prev, newFont]);
-      alert('Tải font lên thành công!');
+      setMessageAlert({ title: 'Thành công', message: 'Tải font lên thành công!' });
     } catch (error) {
       console.error('Error uploading font:', error);
-      alert('Lỗi tải font lên.');
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải font lên.' });
     } finally {
       setUploadingFont(false);
     }
   };
 
-  const handleFontDelete = async (font: CustomFont) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa font ${font.name}?`)) return;
+  const handleFontDelete = (font: CustomFont) => {
+    setDeleteConfirmFont(font);
+  };
+
+  const confirmDeleteFont = async () => {
+    if (!deleteConfirmFont) return;
     try {
-      await deleteCustomFont(font);
-      setFonts(prev => prev.filter(f => f.id !== font.id));
-      alert('Xóa font thành công!');
+      await deleteCustomFont(deleteConfirmFont);
+      setFonts(prev => prev.filter(f => f.id !== deleteConfirmFont.id));
+      setMessageAlert({ title: 'Thành công', message: 'Xóa font thành công!' });
+      setDeleteConfirmFont(null);
     } catch (error) {
       console.error('Error deleting font:', error);
-      alert('Lỗi xóa font.');
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi xóa font.' });
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const base64 = await uploadImage(file, 'settings');
+      setFormData(prev => prev ? { ...prev, logo: base64 } : null);
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải ảnh lên.' });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFavicon(true);
+    try {
+      const base64 = await uploadImage(file, 'settings');
+      setFormData(prev => prev ? { ...prev, favicon: base64 } : null);
+    } catch (error) {
+      console.error('Error uploading favicon:', error);
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải ảnh lên.' });
+    } finally {
+      setUploadingFavicon(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleLogoDrop = async (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    setUploadingLogo(true);
+    try {
+      const base64 = await uploadImage(file, 'settings');
+      setFormData(prev => prev ? { ...prev, logo: base64 } : null);
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải ảnh lên.' });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleFaviconDrop = async (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || (!file.type.startsWith('image/') && !file.name.endsWith('.ico'))) return;
+    setUploadingFavicon(true);
+    try {
+      const base64 = await uploadImage(file, 'settings');
+      setFormData(prev => prev ? { ...prev, favicon: base64 } : null);
+    } catch (error) {
+      console.error('Error uploading favicon:', error);
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải ảnh lên.' });
+    } finally {
+      setUploadingFavicon(false);
+    }
+  };
+
+  const handleFontDrop = async (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    
+    // Check if it's a font file
+    const validExtensions = ['.ttf', '.woff', '.woff2', '.otf'];
+    const isValidFont = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    if (!isValidFont) return;
+
+    const name = prompt('Nhập tên cho font chữ này (ví dụ: MyCustomFont):');
+    if (!name) return;
+
+    setUploadingFont(true);
+    try {
+      const newFont = await uploadCustomFont(file, name);
+      setFonts(prev => [...prev, newFont]);
+      setMessageAlert({ title: 'Thành công', message: 'Tải font lên thành công!' });
+    } catch (error) {
+      console.error('Error uploading font:', error);
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải font lên.' });
+    } finally {
+      setUploadingFont(false);
     }
   };
 
@@ -76,7 +183,7 @@ export default function AdminSettings() {
 
   const handleTranslate = async (targetLangCode: string) => {
     if (!formData?.heroTitle?.['vi']) {
-      alert('Vui lòng nhập nội dung Tiếng Việt trước khi dịch!');
+      setMessageAlert({ title: 'Thông báo', message: 'Vui lòng nhập nội dung Tiếng Việt trước khi dịch!' });
       return;
     }
     setTranslating(true);
@@ -99,10 +206,10 @@ export default function AdminSettings() {
         };
       });
       
-      alert(`Đã dịch tự động sang ${targetLangName}. Bạn có thể chỉnh sửa lại nếu cần.`);
+      setMessageAlert({ title: 'Thành công', message: `Đã dịch tự động sang ${targetLangName}. Bạn có thể chỉnh sửa lại nếu cần.` });
     } catch (error) {
       console.error('Translation error', error);
-      alert('Lỗi dịch tự động.');
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi dịch tự động.' });
     } finally {
       setTranslating(false);
     }
@@ -112,11 +219,28 @@ export default function AdminSettings() {
     if (!formData) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', 'general'), formData);
-      alert('Lưu cấu hình thành công!');
+      // Hàm đệ quy để loại bỏ tất cả các giá trị undefined ở mọi cấp độ (nested)
+      const removeUndefined = (obj: any): any => {
+        if (Array.isArray(obj)) {
+          return obj.map(removeUndefined).filter(item => item !== undefined);
+        } else if (obj !== null && typeof obj === 'object') {
+          return Object.keys(obj).reduce((acc, key) => {
+            if (obj[key] !== undefined) {
+              acc[key] = removeUndefined(obj[key]);
+            }
+            return acc;
+          }, {} as any);
+        }
+        return obj;
+      };
+
+      const cleanFormData = removeUndefined(formData);
+
+      await setDoc(doc(db, 'settings', 'general'), cleanFormData);
+      setMessageAlert({ title: 'Thành công', message: 'Lưu cấu hình thành công!' });
     } catch (error) {
       console.error('Error saving settings', error);
-      alert('Lưu thất bại. Vui lòng thử lại.');
+      setMessageAlert({ title: 'Lỗi', message: 'Lưu thất bại. Vui lòng kiểm tra console để xem chi tiết lỗi.' });
     } finally {
       setSaving(false);
     }
@@ -155,15 +279,30 @@ export default function AdminSettings() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Logo URL</label>
-            <input
-              type="text"
-              name="logo"
-              value={formData.logo}
-              onChange={handleChange}
-              placeholder="https://example.com/logo.png"
-              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-            />
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Logo (URL hoặc Tải lên)</label>
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                name="logo"
+                value={formData.logo}
+                onChange={handleChange}
+                placeholder="https://example.com/logo.png"
+                className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+              />
+              <label 
+                className="flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer whitespace-nowrap transition-colors"
+                onDragOver={handleDragOver}
+                onDrop={handleLogoDrop}
+              >
+                {uploadingLogo ? 'Đang tải...' : 'Tải ảnh'}
+                <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploadingLogo} />
+              </label>
+            </div>
+            {formData.logo && (
+              <div className="mt-2">
+                <img src={formData.logo} alt="Logo preview" className="h-12 object-contain bg-gray-100 dark:bg-gray-800 rounded p-1" />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -185,15 +324,30 @@ export default function AdminSettings() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Favicon URL</label>
-            <input
-              type="text"
-              name="favicon"
-              value={formData.favicon}
-              onChange={handleChange}
-              placeholder="https://example.com/favicon.ico"
-              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-            />
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Favicon (URL hoặc Tải lên)</label>
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                name="favicon"
+                value={formData.favicon}
+                onChange={handleChange}
+                placeholder="https://example.com/favicon.ico"
+                className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+              />
+              <label 
+                className="flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer whitespace-nowrap transition-colors"
+                onDragOver={handleDragOver}
+                onDrop={handleFaviconDrop}
+              >
+                {uploadingFavicon ? 'Đang tải...' : 'Tải ảnh'}
+                <input type="file" accept="image/*,.ico" className="hidden" onChange={handleFaviconUpload} disabled={uploadingFavicon} />
+              </label>
+            </div>
+            {formData.favicon && (
+              <div className="mt-2">
+                <img src={formData.favicon} alt="Favicon preview" className="h-8 w-8 object-contain bg-gray-100 dark:bg-gray-800 rounded p-1" />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -237,9 +391,13 @@ export default function AdminSettings() {
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Tải lên các font chữ độc quyền (.ttf, .woff, .woff2) để sử dụng trong trình soạn thảo.
             </p>
-            <label className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer">
+            <label 
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer"
+              onDragOver={handleDragOver}
+              onDrop={handleFontDrop}
+            >
               <Upload className="w-4 h-4" />
-              {uploadingFont ? 'Đang tải...' : 'Tải Font mới'}
+              {uploadingFont ? 'Đang tải...' : 'Tải Font mới (Kéo thả)'}
               <input type="file" accept=".ttf,.woff,.woff2,.otf" className="hidden" onChange={handleFontUpload} disabled={uploadingFont} />
             </label>
           </div>
@@ -263,6 +421,307 @@ export default function AdminSettings() {
               Chưa có font chữ nào được tải lên.
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Admin Notifications */}
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
+          Admin Notifications (Thông báo trang quản trị)
+        </h3>
+        <div className="space-y-6">
+          
+          {/* Action Specific Settings */}
+          <div className="space-y-4">
+            <h4 className="text-md font-medium text-gray-900 dark:text-white">Nội dung & Hình ảnh theo hành động</h4>
+            
+            {['create', 'update', 'delete', 'reorder'].map((action) => {
+              const actionLabels: Record<string, string> = {
+                create: 'Tạo dự án',
+                update: 'Cập nhật dự án',
+                delete: 'Xóa dự án',
+                reorder: 'Đổi vị trí'
+              };
+              const defaultMsgs: Record<string, string> = {
+                create: 'Đã tạo dự án thành công',
+                update: 'Đã cập nhật dự án thành công',
+                delete: 'Đã xóa dự án thành công',
+                reorder: 'Đã chuyển vị trí thành công'
+              };
+              
+              const currentActionConfig = formData.adminNotifications?.[action as keyof typeof formData.adminNotifications] as any;
+              // Handle migration from old format
+              const message = typeof currentActionConfig === 'object' ? currentActionConfig?.message : (formData.adminNotifications as any)?.[`${action}Msg`] || defaultMsgs[action];
+              const imageUrl = typeof currentActionConfig === 'object' ? currentActionConfig?.imageUrl : '';
+
+              return (
+                <div key={action} className="grid grid-cols-1 gap-4 sm:grid-cols-2 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Thông báo {actionLabels[action]}</label>
+                    <input
+                      type="text"
+                      value={message}
+                      onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), [action]: { message: e.target.value, imageUrl } } } : null)}
+                      className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ảnh linh vật (URL)</label>
+                    <input
+                      type="text"
+                      value={imageUrl}
+                      onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), [action]: { message, imageUrl: e.target.value } } } : null)}
+                      placeholder="https://example.com/mascot.png"
+                      className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Cài đặt hiển thị</h4>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vị trí thông báo</label>
+                <select
+                  value={formData.adminNotifications?.position || 'bottom-left'}
+                  onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), position: e.target.value } } : null)}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                >
+                  <option value="top-left">Góc trên trái</option>
+                  <option value="top-right">Góc trên phải</option>
+                  <option value="top-center">Ở giữa phía trên</option>
+                  <option value="bottom-left">Góc dưới trái</option>
+                  <option value="bottom-right">Góc dưới phải</option>
+                  <option value="bottom-center">Ở giữa phía dưới</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Thời gian hiển thị (ms)</label>
+                <input
+                  type="number"
+                  min="1000"
+                  step="500"
+                  value={formData.adminNotifications?.duration || 3000}
+                  onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), duration: parseInt(e.target.value, 10) } } : null)}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Căn lề chữ</label>
+                <select
+                  value={formData.adminNotifications?.textAlign || 'left'}
+                  onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), textAlign: e.target.value } } : null)}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                >
+                  <option value="left">Trái</option>
+                  <option value="center">Giữa</option>
+                  <option value="right">Phải</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Màu sắc & Khung</h4>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Màu nền</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={formData.adminNotifications?.backgroundColor || '#22c55e'}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), backgroundColor: e.target.value } } : null)}
+                    className="h-8 w-8 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={formData.adminNotifications?.backgroundColor || '#22c55e'}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), backgroundColor: e.target.value } } : null)}
+                    className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-1.5 border"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Màu chữ</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={formData.adminNotifications?.textColor || '#ffffff'}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), textColor: e.target.value } } : null)}
+                    className="h-8 w-8 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={formData.adminNotifications?.textColor || '#ffffff'}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), textColor: e.target.value } } : null)}
+                    className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-1.5 border"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Màu viền</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={formData.adminNotifications?.borderColor || '#000000'}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), borderColor: e.target.value } } : null)}
+                    className="h-8 w-8 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={formData.adminNotifications?.borderColor || '#000000'}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), borderColor: e.target.value } } : null)}
+                    className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-1.5 border"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Độ dày viền (px)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.adminNotifications?.borderWidth || 0}
+                  onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), borderWidth: parseInt(e.target.value, 10) } } : null)}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Bo góc</label>
+                <select
+                  value={formData.adminNotifications?.borderRadius || '8px'}
+                  onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), borderRadius: e.target.value } } : null)}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                >
+                  <option value="0px">Vuông (0px)</option>
+                  <option value="4px">Bo nhẹ (4px)</option>
+                  <option value="8px">Bo vừa (8px)</option>
+                  <option value="16px">Bo nhiều (16px)</option>
+                  <option value="9999px">Bo tròn (9999px)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-4 mt-6">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="fontBold"
+                    checked={formData.adminNotifications?.fontBold || false}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), fontBold: e.target.checked } } : null)}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="fontBold" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    In đậm chữ
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="textShadow"
+                    checked={formData.adminNotifications?.textShadow || false}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), textShadow: e.target.checked } } : null)}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="textShadow" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Đổ bóng chữ
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Chế độ ảnh</h4>
+            <div className="flex items-center gap-2 mb-4">
+              <input
+                type="checkbox"
+                id="showImage"
+                checked={formData.adminNotifications?.showImage || false}
+                onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), showImage: e.target.checked } } : null)}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+              <label htmlFor="showImage" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Hiển thị ảnh linh vật (Ảnh sẽ nằm dưới chữ)
+              </label>
+            </div>
+
+            {formData.adminNotifications?.showImage && (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vị trí ảnh</label>
+                  <select
+                    value={formData.adminNotifications?.imagePosition || 'left'}
+                    onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), imagePosition: e.target.value } } : null)}
+                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                  >
+                    <option value="left">Bên trái</option>
+                    <option value="right">Bên phải</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Preview Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-md font-medium text-gray-900 dark:text-white">Xem trước (Preview)</h4>
+              <select
+                value={previewAction}
+                onChange={(e) => setPreviewAction(e.target.value as any)}
+                className="rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-1 border"
+              >
+                <option value="create">Thêm mới</option>
+                <option value="update">Cập nhật</option>
+                <option value="delete">Xóa</option>
+                <option value="reorder">Đổi vị trí</option>
+              </select>
+            </div>
+            <div className="p-8 bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 relative overflow-hidden min-h-[200px] flex items-center justify-center">
+              <div 
+                className="relative shadow-xl overflow-hidden flex items-center"
+                style={{ 
+                  backgroundColor: formData.adminNotifications?.backgroundColor || '#22c55e',
+                  borderRadius: formData.adminNotifications?.borderRadius || '8px',
+                  borderWidth: `${formData.adminNotifications?.borderWidth || 0}px`,
+                  borderColor: formData.adminNotifications?.borderColor || '#000000',
+                  borderStyle: 'solid',
+                  minWidth: '250px',
+                  minHeight: '60px',
+                }}
+              >
+                {formData.adminNotifications?.showImage && (formData.adminNotifications as any)?.[previewAction]?.imageUrl && (
+                  <img 
+                    src={(formData.adminNotifications as any)[previewAction].imageUrl} 
+                    alt="Preview Mascot" 
+                    className="absolute top-0 bottom-0 h-full object-contain opacity-50 pointer-events-none"
+                    style={{
+                      [formData.adminNotifications?.imagePosition === 'right' ? 'right' : 'left']: 0,
+                      zIndex: 0
+                    }}
+                  />
+                )}
+                <div 
+                  className="relative z-10 w-full px-4 py-3 flex items-center gap-2"
+                  style={{
+                    color: formData.adminNotifications?.textColor || '#ffffff',
+                    fontWeight: formData.adminNotifications?.fontBold ? 'bold' : 'normal',
+                    textAlign: formData.adminNotifications?.textAlign as any || 'left',
+                    textShadow: formData.adminNotifications?.textShadow ? '1px 1px 2px rgba(0,0,0,0.5)' : 'none',
+                    justifyContent: formData.adminNotifications?.textAlign === 'center' ? 'center' : formData.adminNotifications?.textAlign === 'right' ? 'flex-end' : 'flex-start'
+                  }}
+                >
+                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                  <span className="flex-1">{(formData.adminNotifications as any)?.[previewAction]?.message || 'Đã thực hiện thành công'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -347,6 +806,48 @@ export default function AdminSettings() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmFont && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Xác nhận xóa</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">Bạn có chắc chắn muốn xóa font {deleteConfirmFont.name}? Hành động này không thể hoàn tác.</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmFont(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmDeleteFont}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {messageAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">{messageAlert.title}</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">{messageAlert.message}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setMessageAlert(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,8 @@ export default function AdminLanguages() {
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [deleteConfirmLang, setDeleteConfirmLang] = useState<Language | null>(null);
+  const [messageAlert, setMessageAlert] = useState<{title: string, message: string} | null>(null);
 
   const handleAddLanguage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,26 +25,31 @@ export default function AdminLanguages() {
       });
       setNewCode('');
       setNewName('');
-      alert('Thêm ngôn ngữ thành công!');
+      setMessageAlert({ title: 'Thành công', message: 'Thêm ngôn ngữ thành công!' });
     } catch (error) {
       console.error('Error adding language', error);
-      alert('Thêm thất bại.');
+      setMessageAlert({ title: 'Lỗi', message: 'Thêm thất bại.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (lang: Language) => {
+  const handleDelete = (lang: Language) => {
     if (lang.isDefault) {
-      alert('Không thể xóa ngôn ngữ mặc định!');
+      setMessageAlert({ title: 'Cảnh báo', message: 'Không thể xóa ngôn ngữ mặc định!' });
       return;
     }
-    if (window.confirm(`Bạn có chắc chắn muốn xóa ngôn ngữ ${lang.name}?`)) {
+    setDeleteConfirmLang(lang);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirmLang) {
       try {
-        await deleteDoc(doc(db, 'languages', lang.id));
+        await deleteDoc(doc(db, 'languages', deleteConfirmLang.id));
+        setDeleteConfirmLang(null);
       } catch (error) {
         console.error('Error deleting language', error);
-        alert('Xóa thất bại.');
+        setMessageAlert({ title: 'Lỗi', message: 'Xóa thất bại.' });
       }
     }
   };
@@ -57,7 +64,7 @@ export default function AdminLanguages() {
       await Promise.all(promises);
     } catch (error) {
       console.error('Error setting default language', error);
-      alert('Cập nhật thất bại.');
+      setMessageAlert({ title: 'Lỗi', message: 'Cập nhật thất bại.' });
     }
   };
 
@@ -159,6 +166,48 @@ export default function AdminLanguages() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmLang && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Xác nhận xóa</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">Bạn có chắc chắn muốn xóa ngôn ngữ {deleteConfirmLang.name}? Hành động này không thể hoàn tác.</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmLang(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {messageAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">{messageAlert.title}</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">{messageAlert.message}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setMessageAlert(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
