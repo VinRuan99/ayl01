@@ -244,15 +244,12 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
 
           {block.type === 'image-text' && (
             <div className="space-y-4">
-              <div className="flex flex-wrap gap-2 mb-2 items-center">
+              <div className="flex gap-2 mb-2">
                 <button onClick={() => updateBlock(block.id, { imagePosition: 'left' })} className={`px-3 py-1 text-sm rounded ${block.imagePosition === 'left' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>Ảnh bên trái</button>
                 <button onClick={() => updateBlock(block.id, { imagePosition: 'right' })} className={`px-3 py-1 text-sm rounded ${block.imagePosition === 'right' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>Ảnh bên phải</button>
-                <div className="w-px h-6 bg-gray-300 mx-2 hidden sm:block"></div>
-                <button onClick={() => updateBlock(block.id, { ratio: '50-50' })} className={`px-3 py-1 text-sm rounded ${(!block.ratio || block.ratio === '50-50') ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>Tỷ lệ 5:5</button>
-                <button onClick={() => updateBlock(block.id, { ratio: '70-30' })} className={`px-3 py-1 text-sm rounded ${block.ratio === '70-30' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>Tỷ lệ 7:3 (Ảnh rộng)</button>
               </div>
               <div className={`flex flex-col md:flex-row gap-6 ${block.imagePosition === 'right' ? 'md:flex-row-reverse' : ''}`}>
-                <div className={`w-full ${block.ratio === '70-30' ? 'md:w-[70%]' : 'md:w-1/2'}`}>
+                <div className="w-full md:w-1/2">
                   {block.imageUrl ? (
                     <div className="relative group/img">
                       <img src={block.imageUrl || undefined} alt="Block" className="w-full rounded-lg object-cover" />
@@ -293,7 +290,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
                     </div>
                   )}
                 </div>
-                <div className={`w-full ${block.ratio === '70-30' ? 'md:w-[30%]' : 'md:w-1/2'}`}>
+                <div className="w-full md:w-1/2">
                   <RichTextEditor
                     content={block.text}
                     onChange={(text) => updateBlock(block.id, { text })}

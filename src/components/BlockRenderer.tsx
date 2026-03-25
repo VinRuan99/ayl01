@@ -31,10 +31,10 @@ export default function BlockRenderer({ blocks }: BlockRendererProps) {
           case 'image-text':
             return (
               <div key={block.id} className={`flex flex-col md:flex-row gap-8 items-center ${block.imagePosition === 'right' ? 'md:flex-row-reverse' : ''}`}>
-                <div className={`w-full ${block.ratio === '70-30' ? 'md:w-[70%]' : 'md:w-1/2'}`}>
+                <div className="w-full md:w-1/2">
                   <img src={block.imageUrl || undefined} alt="Project image" className="w-full rounded-xl shadow-md" />
                 </div>
-                <div className={`w-full ${block.ratio === '70-30' ? 'md:w-[30%]' : 'md:w-1/2'} prose prose-lg prose-indigo dark:prose-invert max-w-none text-justify`} dangerouslySetInnerHTML={{ __html: block.text }} />
+                <div className="w-full md:w-1/2 prose prose-lg prose-indigo dark:prose-invert max-w-none text-justify" dangerouslySetInnerHTML={{ __html: block.text }} />
               </div>
             );
           default:

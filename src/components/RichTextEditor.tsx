@@ -95,37 +95,21 @@ const MenuBar = ({ editor, customFonts }: { editor: any, customFonts: CustomFont
           ))}
         </select>
 
-        <div className="relative flex items-center">
-          <input
-            type="text"
-            list="font-sizes"
-            placeholder="Cỡ chữ"
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val) {
-                const size = /^\d+$/.test(val) ? `${val}px` : val;
-                editor.chain().focus().setFontSize(size).run();
-              } else {
-                editor.chain().focus().unsetFontSize().run();
-              }
-            }}
-            value={editor.getAttributes('textStyle').fontSize?.replace('px', '') || ''}
-            className="text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-1 px-2 focus:ring-indigo-500 focus:border-indigo-500 w-20"
-          />
-          <datalist id="font-sizes">
-            <option value="12" />
-            <option value="14" />
-            <option value="16" />
-            <option value="18" />
-            <option value="20" />
-            <option value="24" />
-            <option value="30" />
-            <option value="36" />
-            <option value="48" />
-            <option value="64" />
-            <option value="72" />
-          </datalist>
-        </div>
+        <select
+          onChange={(e) => editor.chain().focus().setFontSize(e.target.value).run()}
+          value={editor.getAttributes('textStyle').fontSize || ''}
+          className="text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-1 px-2 focus:ring-indigo-500 focus:border-indigo-500 w-20"
+        >
+          <option value="">Cỡ chữ</option>
+          <option value="12px">12px</option>
+          <option value="14px">14px</option>
+          <option value="16px">16px</option>
+          <option value="18px">18px</option>
+          <option value="20px">20px</option>
+          <option value="24px">24px</option>
+          <option value="30px">30px</option>
+          <option value="36px">36px</option>
+        </select>
 
         <div className="relative flex items-center">
           <input

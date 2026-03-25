@@ -50,8 +50,7 @@ export default function AdminNotification() {
 
   const actionConfig = config[adminNotification.type as keyof typeof config] as any;
   const message = actionConfig?.message || adminNotification.message;
-  const globalImageUrl = (config as any).imageUrl || '';
-  const imageUrl = typeof actionConfig === 'object' ? (actionConfig?.imageUrl || '') : globalImageUrl;
+  const imageUrl = actionConfig?.imageUrl || '';
 
   const hasImage = config.showImage && imageUrl;
 
@@ -72,7 +71,7 @@ export default function AdminNotification() {
         <img 
           src={imageUrl} 
           alt="Notification Mascot" 
-          className="absolute top-1/2 -translate-y-1/2 h-[60px] object-contain opacity-50 pointer-events-none"
+          className="absolute top-0 bottom-0 h-full object-contain opacity-50 pointer-events-none"
           style={{
             [config.imagePosition === 'right' ? 'right' : 'left']: 0,
             zIndex: 0

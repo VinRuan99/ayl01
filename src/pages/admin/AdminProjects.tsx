@@ -38,7 +38,7 @@ const OrderInput = ({ index, projectId, onReorder, max }: { index: number, proje
 };
 
 export default function AdminProjects() {
-  const { user, languages, showAdminNotification, settings } = useStore();
+  const { user, languages, showAdminNotification } = useStore();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [currentProject, setCurrentProject] = useState<Partial<Project>>({});
@@ -415,14 +415,6 @@ export default function AdminProjects() {
                 <option value="Biệt thự">Biệt thự</option>
                 <option value="Đất nền">Đất nền</option>
                 <option value="Nhà phố">Nhà phố</option>
-                {settings?.customProjectTypes?.map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-                {currentProject.type && 
-                 !['Căn hộ', 'Biệt thự', 'Đất nền', 'Nhà phố'].includes(currentProject.type) && 
-                 !(settings?.customProjectTypes || []).includes(currentProject.type) && (
-                  <option value={currentProject.type}>{currentProject.type}</option>
-                )}
               </select>
             </div>
             <div className="md:col-span-3">
