@@ -87,27 +87,16 @@ export default function Home() {
               <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
                 {getLocalizedText(settings?.aboutDescription, 'Với hơn 10 năm kinh nghiệm, Ayaland tự hào là đơn vị tiên phong trong lĩnh vực phát triển và quản lý bất động sản cao cấp. Chúng tôi cam kết mang lại những giá trị vượt trội cho khách hàng và đối tác.')}
               </p>
-              
-              {settings?.showAboutStats !== false && (
-                <div className="mt-10 grid grid-cols-2 gap-8">
-                  <div>
-                    <h4 className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">
-                      {settings?.aboutStat1Value || '10+'}
-                    </h4>
-                    <p className="text-gray-600 dark:text-gray-400 font-medium">
-                      {getLocalizedText(settings?.aboutStat1Label, currentLanguage === 'vi' ? 'Năm kinh nghiệm' : 'Years Experience')}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">
-                      {settings?.aboutStat2Value || `${projects.length}+`}
-                    </h4>
-                    <p className="text-gray-600 dark:text-gray-400 font-medium">
-                      {getLocalizedText(settings?.aboutStat2Label, currentLanguage === 'vi' ? 'Dự án hoàn thành' : 'Completed Projects')}
-                    </p>
-                  </div>
+              <div className="mt-10 grid grid-cols-2 gap-8">
+                <div>
+                  <h4 className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">10+</h4>
+                  <p className="text-gray-600 dark:text-gray-400 font-medium">{currentLanguage === 'vi' ? 'Năm kinh nghiệm' : 'Years Experience'}</p>
                 </div>
-              )}
+                <div>
+                  <h4 className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">{projects.length}+</h4>
+                  <p className="text-gray-600 dark:text-gray-400 font-medium">{currentLanguage === 'vi' ? 'Dự án hoàn thành' : 'Completed Projects'}</p>
+                </div>
+              </div>
             </div>
             <div className="relative">
               <div className="aspect-[4/5] rounded-2xl overflow-hidden shadow-2xl">
