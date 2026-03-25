@@ -50,6 +50,12 @@ export interface Settings {
   heroImages: string[];
   aboutTitle: Record<string, string>;
   aboutDescription: Record<string, string>;
+  showAboutStats?: boolean;
+  aboutStat1Value?: string;
+  aboutStat1Label?: Record<string, string>;
+  aboutStat2Value?: string;
+  aboutStat2Label?: Record<string, string>;
+  customProjectTypes?: string[];
   adminNotifications?: AdminNotificationSettings;
 }
 
