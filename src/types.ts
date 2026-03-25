@@ -26,7 +26,6 @@ export interface ImageTextBlock extends BaseBlock {
   imageUrl: string;
   text: string;
   imagePosition: 'left' | 'right';
-  ratio?: '50-50' | '70-30';
 }
 
 export type ContentBlock = RichTextBlock | SingleImageBlock | ImageSliderBlock | ImageTextBlock;

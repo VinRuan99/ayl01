@@ -16,10 +16,8 @@ export default function AdminSettings() {
   const [uploadingFont, setUploadingFont] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
-  const [uploadingMascot, setUploadingMascot] = useState<string | null>(null);
   const [deleteConfirmFont, setDeleteConfirmFont] = useState<CustomFont | null>(null);
   const [messageAlert, setMessageAlert] = useState<{title: string, message: string} | null>(null);
-  const [fontPrompt, setFontPrompt] = useState<{file: File, resolve: (name: string | null) => void} | null>(null);
   const [previewAction, setPreviewAction] = useState<'create' | 'update' | 'delete' | 'reorder'>('create');
 
   useEffect(() => {
@@ -36,10 +34,7 @@ export default function AdminSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const name = await new Promise<string | null>((resolve) => {
-      setFontPrompt({ file, resolve });
-    });
-    
+    const name = prompt('Nhập tên cho font chữ này (ví dụ: MyCustomFont):');
     if (!name) return;
 
     setUploadingFont(true);
@@ -141,38 +136,6 @@ export default function AdminSettings() {
     }
   };
 
-  const handleMascotUpload = async (e: React.ChangeEvent<HTMLInputElement>, action: string, message: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingMascot(action);
-    try {
-      const base64 = await uploadImage(file, 'settings');
-      setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), [action]: { message, imageUrl: base64 } } } : null);
-    } catch (error) {
-      console.error('Error uploading mascot:', error);
-      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải ảnh lên.' });
-    } finally {
-      setUploadingMascot(null);
-    }
-  };
-
-  const handleMascotDrop = async (e: React.DragEvent<HTMLLabelElement>, action: string, message: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const file = e.dataTransfer.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
-    setUploadingMascot(action);
-    try {
-      const base64 = await uploadImage(file, 'settings');
-      setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), [action]: { message, imageUrl: base64 } } } : null);
-    } catch (error) {
-      console.error('Error uploading mascot:', error);
-      setMessageAlert({ title: 'Lỗi', message: 'Lỗi tải ảnh lên.' });
-    } finally {
-      setUploadingMascot(null);
-    }
-  };
-
   const handleFontDrop = async (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -184,10 +147,7 @@ export default function AdminSettings() {
     const isValidFont = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
     if (!isValidFont) return;
 
-    const name = await new Promise<string | null>((resolve) => {
-      setFontPrompt({ file, resolve });
-    });
-    
+    const name = prompt('Nhập tên cho font chữ này (ví dụ: MyCustomFont):');
     if (!name) return;
 
     setUploadingFont(true);
@@ -208,13 +168,13 @@ export default function AdminSettings() {
     setFormData((prev) => prev ? { ...prev, [name]: value } : null);
   };
 
-  const handleHeroChange = (field: 'heroTitle' | 'heroSubtitle' | 'aboutTitle' | 'aboutDescription' | 'aboutStat1Label' | 'aboutStat2Label', langCode: string, value: string) => {
+  const handleHeroChange = (field: 'heroTitle' | 'heroSubtitle' | 'aboutTitle' | 'aboutDescription', langCode: string, value: string) => {
     setFormData((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
         [field]: {
-          ...(prev[field] as Record<string, string>),
+          ...prev[field],
           [langCode]: value,
         },
       };
@@ -234,8 +194,6 @@ export default function AdminSettings() {
       const translatedSubtitle = formData.heroSubtitle?.['vi'] ? await translateText(formData.heroSubtitle['vi'], targetLangName) : '';
       const translatedAboutTitle = formData.aboutTitle?.['vi'] ? await translateText(formData.aboutTitle['vi'], targetLangName) : '';
       const translatedAboutDesc = formData.aboutDescription?.['vi'] ? await translateText(formData.aboutDescription['vi'], targetLangName) : '';
-      const translatedStat1Label = formData.aboutStat1Label?.['vi'] ? await translateText(formData.aboutStat1Label['vi'], targetLangName) : '';
-      const translatedStat2Label = formData.aboutStat2Label?.['vi'] ? await translateText(formData.aboutStat2Label['vi'], targetLangName) : '';
 
       setFormData(prev => {
         if (!prev) return prev;
@@ -245,8 +203,6 @@ export default function AdminSettings() {
           heroSubtitle: { ...prev.heroSubtitle, [targetLangCode]: translatedSubtitle },
           aboutTitle: { ...prev.aboutTitle, [targetLangCode]: translatedAboutTitle },
           aboutDescription: { ...prev.aboutDescription, [targetLangCode]: translatedAboutDesc },
-          aboutStat1Label: { ...(prev.aboutStat1Label || {}), [targetLangCode]: translatedStat1Label },
-          aboutStat2Label: { ...(prev.aboutStat2Label || {}), [targetLangCode]: translatedStat2Label },
         };
       });
       
@@ -279,13 +235,6 @@ export default function AdminSettings() {
       };
 
       const cleanFormData = removeUndefined(formData);
-
-      if (cleanFormData.customProjectTypes) {
-        cleanFormData.customProjectTypes = cleanFormData.customProjectTypes.map((s: string) => s.trim()).filter(Boolean);
-      }
-      if (cleanFormData.heroImages) {
-        cleanFormData.heroImages = cleanFormData.heroImages.map((s: string) => s.trim()).filter(Boolean);
-      }
 
       await setDoc(doc(db, 'settings', 'general'), cleanFormData);
       setMessageAlert({ title: 'Thành công', message: 'Lưu cấu hình thành công!' });
@@ -517,29 +466,14 @@ export default function AdminSettings() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ảnh linh vật (URL hoặc Tải lên)</label>
-                    <div className="mt-1 flex gap-2">
-                      <input
-                        type="text"
-                        value={imageUrl}
-                        onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), [action]: { message, imageUrl: e.target.value } } } : null)}
-                        placeholder="https://example.com/mascot.png"
-                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-                      />
-                      <label 
-                        className="flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer whitespace-nowrap transition-colors"
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleMascotDrop(e, action, message)}
-                      >
-                        {uploadingMascot === action ? 'Đang tải...' : 'Tải ảnh'}
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleMascotUpload(e, action, message)} disabled={uploadingMascot === action} />
-                      </label>
-                    </div>
-                    {imageUrl && (
-                      <div className="mt-2">
-                        <img src={imageUrl} alt="Mascot preview" className="h-12 object-contain bg-gray-100 dark:bg-gray-800 rounded p-1" />
-                      </div>
-                    )}
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ảnh linh vật (URL)</label>
+                    <input
+                      type="text"
+                      value={imageUrl}
+                      onChange={(e) => setFormData(prev => prev ? { ...prev, adminNotifications: { ...(prev.adminNotifications || {} as any), [action]: { message, imageUrl: e.target.value } } } : null)}
+                      placeholder="https://example.com/mascot.png"
+                      className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                    />
                   </div>
                 </div>
               );
@@ -794,29 +728,6 @@ export default function AdminSettings() {
       {/* Hero Section */}
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
-          Cấu hình Dự án
-        </h3>
-        
-        <div className="space-y-6 mb-8">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Các loại hình dự án bổ sung (cách nhau bởi dấu phẩy)
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              Mặc định đã có: Căn hộ, Biệt thự, Đất nền, Nhà phố. Bạn có thể thêm các loại hình khác ở đây.
-            </p>
-            <textarea
-              name="customProjectTypes"
-              value={(formData.customProjectTypes || []).join(',')}
-              onChange={(e) => setFormData(prev => prev ? { ...prev, customProjectTypes: e.target.value.split(',') } : null)}
-              rows={2}
-              placeholder="VD: Shophouse, Condotel, Officetel"
-              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-            />
-          </div>
-        </div>
-
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
           Hero Section (Trang chủ)
         </h3>
         
@@ -825,8 +736,8 @@ export default function AdminSettings() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ảnh Slider (URLs, cách nhau bởi dấu phẩy)</label>
             <textarea
               name="heroImages"
-              value={(formData.heroImages || []).join(',')}
-              onChange={(e) => setFormData(prev => prev ? { ...prev, heroImages: e.target.value.split(',') } : null)}
+              value={formData.heroImages.join(', ')}
+              onChange={(e) => setFormData(prev => prev ? { ...prev, heroImages: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } : null)}
               rows={3}
               className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
             />
@@ -889,84 +800,6 @@ export default function AdminSettings() {
                       className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
                     />
                   </div>
-                  
-                  {/* Stats Settings */}
-                  {lang.isDefault && (
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2 col-span-1">
-                      <div className="flex items-center gap-2 mb-4">
-                        <input
-                          type="checkbox"
-                          id="showAboutStats"
-                          checked={formData.showAboutStats !== false}
-                          onChange={(e) => setFormData(prev => prev ? { ...prev, showAboutStats: e.target.checked } : null)}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor="showAboutStats" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Hiển thị phần Thống kê (Stats)
-                        </label>
-                      </div>
-                      
-                      {formData.showAboutStats !== false && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                            <h6 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase">Thống kê 1</h6>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Giá trị (VD: 10+)</label>
-                                <input
-                                  type="text"
-                                  value={formData.aboutStat1Value || ''}
-                                  onChange={(e) => setFormData(prev => prev ? { ...prev, aboutStat1Value: e.target.value } : null)}
-                                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-1.5 border"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                            <h6 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase">Thống kê 2</h6>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Giá trị (VD: 50+)</label>
-                                <input
-                                  type="text"
-                                  value={formData.aboutStat2Value || ''}
-                                  onChange={(e) => setFormData(prev => prev ? { ...prev, aboutStat2Value: e.target.value } : null)}
-                                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-1.5 border"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {formData.showAboutStats !== false && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Nhãn Thống kê 1 ({lang.name})</label>
-                        <input
-                          type="text"
-                          value={formData.aboutStat1Label?.[lang.code] || ''}
-                          onChange={(e) => handleHeroChange('aboutStat1Label', lang.code, e.target.value)}
-                          placeholder="VD: Năm kinh nghiệm"
-                          className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-1.5 border"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Nhãn Thống kê 2 ({lang.name})</label>
-                        <input
-                          type="text"
-                          value={formData.aboutStat2Label?.[lang.code] || ''}
-                          onChange={(e) => handleHeroChange('aboutStat2Label', lang.code, e.target.value)}
-                          placeholder="VD: Dự án hoàn thành"
-                          className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-1.5 border"
-                        />
-                      </div>
-                    </div>
-                  )}
-
                 </div>
               </div>
             ))}
@@ -1010,54 +843,6 @@ export default function AdminSettings() {
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
               >
                 Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Font Name Prompt Modal */}
-      {fontPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Nhập tên font</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">Nhập tên cho font chữ này (ví dụ: MyCustomFont):</p>
-            <input
-              type="text"
-              id="fontNameInput"
-              className="w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border mb-6"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = (e.target as HTMLInputElement).value;
-                  if (val) {
-                    fontPrompt.resolve(val);
-                    setFontPrompt(null);
-                  }
-                }
-              }}
-            />
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  fontPrompt.resolve(null);
-                  setFontPrompt(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={() => {
-                  const input = document.getElementById('fontNameInput') as HTMLInputElement;
-                  if (input && input.value) {
-                    fontPrompt.resolve(input.value);
-                    setFontPrompt(null);
-                  }
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
-              >
-                Xác nhận
               </button>
             </div>
           </div>
