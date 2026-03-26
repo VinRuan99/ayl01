@@ -167,5 +167,11 @@ service cloud.firestore {
       allow update: if isRoot() && isValidFont();
       allow delete: if isRoot();
     }
+
+    match /stats/{statId} {
+      allow read: if hasAdminAccess();
+      allow create: if statId == 'visits' && request.resource.data.keys().hasOnly(['count']) && request.resource.data.count == 1;
+      allow update: if statId == 'visits' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count']) && request.resource.data.count == resource.data.count + 1;
+    }
   }
 }

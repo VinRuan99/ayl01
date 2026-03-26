@@ -1,5 +1,27 @@
 import imageCompression from 'browser-image-compression';
 
+export const uploadFile = async (file: File): Promise<string> => {
+  try {
+    const formData = new FormData();
+    formData.append('image', file, file.name); // Using 'image' field as expected by the server
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Upload failed');
+    }
+
+    const data = await response.json();
+    return data.url;
+  } catch (error) {
+    console.error("Error uploading file to local server:", error);
+    throw error;
+  }
+};
+
 export const uploadImage = async (file: File, path: string = 'projects'): Promise<string> => {
   try {
     let fileToUpload = file;

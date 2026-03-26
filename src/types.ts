@@ -37,7 +37,8 @@ export interface Project {
   description: Record<string, string | ContentBlock[]>; // Support legacy string descriptions
   location: Record<string, string>;
   price: number;
-  area: number;
+  area: string | number;
+  hideArea?: boolean;
   type: string;
   images: string[];
   createdAt: string;

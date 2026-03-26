@@ -396,12 +396,25 @@ export default function AdminProjects() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Diện tích (m2)</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Diện tích (m2)</label>
+                <label className="flex items-center text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={currentProject.hideArea || false}
+                    onChange={(e) => setCurrentProject({ ...currentProject, hideArea: e.target.checked })}
+                    className="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Ẩn
+                </label>
+              </div>
               <input
-                type="number"
-                value={currentProject.area || 0}
-                onChange={(e) => setCurrentProject({ ...currentProject, area: Number(e.target.value) })}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                type="text"
+                value={currentProject.area || ''}
+                onChange={(e) => setCurrentProject({ ...currentProject, area: e.target.value })}
+                placeholder="VD: 205 - 300"
+                disabled={currentProject.hideArea}
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border disabled:opacity-50"
               />
             </div>
             <div>
@@ -690,8 +703,12 @@ export default function AdminProjects() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                   <span className="font-medium text-gray-900 dark:text-white">{formatPrice(project.price)}</span>
-                  <br />
-                  <span className="text-xs">{project.area} m²</span>
+                  {!project.hideArea && (
+                    <>
+                      <br />
+                      <span className="text-xs">{String(project.area).match(/m2|m²|ha/i) ? project.area : `${project.area} m²`}</span>
+                    </>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                   {project.createdBy}

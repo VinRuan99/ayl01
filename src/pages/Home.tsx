@@ -12,7 +12,8 @@ interface Project {
   description: Record<string, ContentBlock[]>;
   location: Record<string, string>;
   price: number;
-  area: number;
+  area: string | number;
+  hideArea?: boolean;
   type: string;
   images: string[];
   createdAt: string;

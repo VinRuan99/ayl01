@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, Link } from 'react-router-dom';
+import { doc, setDoc, increment } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useStore } from '../store/useStore';
 import { Sun, Moon, Globe, Phone, X } from 'lucide-react';
 
@@ -19,6 +21,30 @@ export default function PublicLayout() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
+  }, []);
+
+  useEffect(() => {
+    const trackVisit = async () => {
+      if (!sessionStorage.getItem('visited')) {
+        try {
+          const statsRef = doc(db, 'stats', 'visits');
+          await setDoc(statsRef, { count: increment(1) }, { merge: true });
+          
+          // Track daily visits
+          const today = new Date().toISOString().split('T')[0];
+          const dailyRef = doc(db, 'stats', `visits_${today}`);
+          await setDoc(dailyRef, { 
+            date: today,
+            count: increment(1) 
+          }, { merge: true });
+
+          sessionStorage.setItem('visited', 'true');
+        } catch (error) {
+          console.error('Error tracking visit:', error);
+        }
+      }
+    };
+    trackVisit();
   }, []);
 
   return (

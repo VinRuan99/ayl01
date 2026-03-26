@@ -2,12 +2,14 @@ import { collection, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore'
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { v4 as uuidv4 } from 'uuid';
+import { uploadFile } from './storage';
 
 export interface CustomFont {
   id: string;
   name: string;
   url: string;
   format: string;
+  isGoogleFont?: boolean;
 }
 
 export const loadCustomFonts = async (): Promise<CustomFont[]> => {
@@ -18,18 +20,26 @@ export const loadCustomFonts = async (): Promise<CustomFont[]> => {
     // Inject fonts into document head
     fonts.forEach(font => {
       if (!document.getElementById(`font-${font.id}`)) {
-        const style = document.createElement('style');
-        style.id = `font-${font.id}`;
-        style.innerHTML = `
-          @font-face {
-            font-family: '${font.name}';
-            src: url('${font.url}') format('${font.format}');
-            font-weight: normal;
-            font-style: normal;
-            font-display: swap;
-          }
-        `;
-        document.head.appendChild(style);
+        if (font.isGoogleFont) {
+          const link = document.createElement('link');
+          link.id = `font-${font.id}`;
+          link.rel = 'stylesheet';
+          link.href = font.url;
+          document.head.appendChild(link);
+        } else {
+          const style = document.createElement('style');
+          style.id = `font-${font.id}`;
+          style.innerHTML = `
+            @font-face {
+              font-family: '${font.name}';
+              src: url('${font.url}') format('${font.format}');
+              font-weight: normal;
+              font-style: normal;
+              font-display: swap;
+            }
+          `;
+          document.head.appendChild(style);
+        }
       }
     });
     
@@ -45,18 +55,13 @@ export const uploadCustomFont = async (file: File, name: string): Promise<Custom
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
     const format = fileExtension === 'ttf' ? 'truetype' : fileExtension === 'woff' ? 'woff' : fileExtension === 'woff2' ? 'woff2' : 'opentype';
     
-    // Convert font file to Base64 to bypass Firebase Storage CORS issues
-    const base64Url = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
+    // Upload font file to local server
+    const fontUrl = await uploadFile(file);
     
     const font: CustomFont = {
       id: uuidv4(),
       name,
-      url: base64Url,
+      url: fontUrl,
       format,
     };
     
@@ -79,6 +84,32 @@ export const uploadCustomFont = async (file: File, name: string): Promise<Custom
     return font;
   } catch (error) {
     console.error("Error uploading font:", error);
+    throw error;
+  }
+};
+
+export const addGoogleFont = async (name: string, url: string): Promise<CustomFont> => {
+  try {
+    const font: CustomFont = {
+      id: uuidv4(),
+      name,
+      url,
+      format: 'google',
+      isGoogleFont: true,
+    };
+    
+    await setDoc(doc(db, 'fonts', font.id), font);
+    
+    // Inject immediately
+    const link = document.createElement('link');
+    link.id = `font-${font.id}`;
+    link.rel = 'stylesheet';
+    link.href = font.url;
+    document.head.appendChild(link);
+    
+    return font;
+  } catch (error) {
+    console.error("Error adding Google font:", error);
     throw error;
   }
 };

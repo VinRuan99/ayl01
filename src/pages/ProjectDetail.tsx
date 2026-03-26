@@ -137,15 +137,19 @@ export default function ProjectDetail() {
               </h3>
               
               <div className="space-y-6 mb-8">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
-                    <Maximize className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                {!project.hideArea && (
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
+                      <Maximize className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{currentLanguage === 'vi' ? 'Quy mô diện tích' : 'Total Area'}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white text-lg">
+                        {String(project.area).match(/m2|m²|ha/i) ? project.area : `${project.area} m²`}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{currentLanguage === 'vi' ? 'Quy mô diện tích' : 'Total Area'}</p>
-                    <p className="font-semibold text-gray-900 dark:text-white text-lg">{project.area} m²</p>
-                  </div>
-                </div>
+                )}
                 
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-white dark:bg-gray-700 rounded-lg shadow-sm">

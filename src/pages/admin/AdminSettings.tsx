@@ -4,7 +4,7 @@ import { db } from '../../lib/firebase';
 import { useStore, Settings } from '../../store/useStore';
 import { Save, Globe, Upload, Trash2, CheckCircle } from 'lucide-react';
 import { translateText } from '../../lib/translate';
-import { CustomFont, loadCustomFonts, uploadCustomFont, deleteCustomFont } from '../../lib/fonts';
+import { CustomFont, loadCustomFonts, uploadCustomFont, deleteCustomFont, addGoogleFont } from '../../lib/fonts';
 import { uploadImage } from '../../lib/storage';
 
 export default function AdminSettings() {
@@ -20,6 +20,8 @@ export default function AdminSettings() {
   const [deleteConfirmFont, setDeleteConfirmFont] = useState<CustomFont | null>(null);
   const [messageAlert, setMessageAlert] = useState<{title: string, message: string} | null>(null);
   const [fontPrompt, setFontPrompt] = useState<{file: File, resolve: (name: string | null) => void} | null>(null);
+  const [googleFontPrompt, setGoogleFontPrompt] = useState(false);
+  const [googleFontData, setGoogleFontData] = useState({ name: '', url: '' });
   const [previewAction, setPreviewAction] = useState<'create' | 'update' | 'delete' | 'reorder'>('create');
 
   useEffect(() => {
@@ -36,6 +38,14 @@ export default function AdminSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    // Check if it's a font file
+    const validExtensions = ['.ttf', '.woff', '.woff2', '.otf'];
+    const isValidFont = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    if (!isValidFont) {
+      setMessageAlert({ title: 'Lỗi', message: 'Định dạng font không hợp lệ. Vui lòng chọn file .ttf, .woff, .woff2, hoặc .otf' });
+      return;
+    }
+
     const name = await new Promise<string | null>((resolve) => {
       setFontPrompt({ file, resolve });
     });
@@ -57,6 +67,49 @@ export default function AdminSettings() {
 
   const handleFontDelete = (font: CustomFont) => {
     setDeleteConfirmFont(font);
+  };
+
+  const handleAddGoogleFont = async () => {
+    let finalUrl = googleFontData.url;
+    let finalName = googleFontData.name;
+
+    // Extract URL if user pasted the whole <link> tag
+    if (finalUrl.includes('<link')) {
+      const matches = Array.from(finalUrl.matchAll(/href=["'](.*?)["']/g));
+      const cssMatch = matches.find(m => m[1].includes('fonts.googleapis.com/css'));
+      if (cssMatch) {
+        finalUrl = cssMatch[1];
+      } else if (matches.length > 0) {
+        finalUrl = matches[matches.length - 1][1];
+      }
+    }
+
+    // Auto-extract name if empty
+    if (!finalName && finalUrl.includes('family=')) {
+      const familyMatch = finalUrl.match(/[?&]family=([^:&]+)/);
+      if (familyMatch && familyMatch[1]) {
+        finalName = familyMatch[1].replace(/\+/g, ' ');
+      }
+    }
+
+    if (!finalName || !finalUrl) {
+      setMessageAlert({ title: 'Lỗi', message: 'Vui lòng nhập đầy đủ tên và URL của Google Font.' });
+      return;
+    }
+
+    setUploadingFont(true);
+    try {
+      const newFont = await addGoogleFont(finalName, finalUrl);
+      setFonts(prev => [...prev, newFont]);
+      setMessageAlert({ title: 'Thành công', message: 'Thêm Google Font thành công!' });
+      setGoogleFontPrompt(false);
+      setGoogleFontData({ name: '', url: '' });
+    } catch (error) {
+      console.error('Error adding Google font:', error);
+      setMessageAlert({ title: 'Lỗi', message: 'Lỗi thêm Google Font.' });
+    } finally {
+      setUploadingFont(false);
+    }
   };
 
   const confirmDeleteFont = async () => {
@@ -102,12 +155,17 @@ export default function AdminSettings() {
     }
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
   };
 
-  const handleLogoDrop = async (e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDragEnter = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleLogoDrop = async (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
     const file = e.dataTransfer.files?.[0];
@@ -124,7 +182,7 @@ export default function AdminSettings() {
     }
   };
 
-  const handleFaviconDrop = async (e: React.DragEvent<HTMLLabelElement>) => {
+  const handleFaviconDrop = async (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
     const file = e.dataTransfer.files?.[0];
@@ -156,7 +214,7 @@ export default function AdminSettings() {
     }
   };
 
-  const handleMascotDrop = async (e: React.DragEvent<HTMLLabelElement>, action: string, message: string) => {
+  const handleMascotDrop = async (e: React.DragEvent<HTMLElement>, action: string, message: string) => {
     e.preventDefault();
     e.stopPropagation();
     const file = e.dataTransfer.files?.[0];
@@ -173,7 +231,7 @@ export default function AdminSettings() {
     }
   };
 
-  const handleFontDrop = async (e: React.DragEvent<HTMLLabelElement>) => {
+  const handleFontDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     const file = e.dataTransfer.files?.[0];
@@ -182,7 +240,10 @@ export default function AdminSettings() {
     // Check if it's a font file
     const validExtensions = ['.ttf', '.woff', '.woff2', '.otf'];
     const isValidFont = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-    if (!isValidFont) return;
+    if (!isValidFont) {
+      setMessageAlert({ title: 'Lỗi', message: 'Định dạng font không hợp lệ. Vui lòng chọn file .ttf, .woff, .woff2, hoặc .otf' });
+      return;
+    }
 
     const name = await new Promise<string | null>((resolve) => {
       setFontPrompt({ file, resolve });
@@ -433,24 +494,38 @@ export default function AdminSettings() {
       </div>
 
       {/* Font Management */}
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+      <div 
+        className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-700 relative"
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDrop={handleFontDrop}
+      >
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
           Font Management (Quản lý Font chữ)
         </h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Tải lên các font chữ độc quyền (.ttf, .woff, .woff2) để sử dụng trong trình soạn thảo.
+              Tải lên các font chữ độc quyền (.ttf, .woff, .woff2) hoặc nhúng từ Google Fonts để sử dụng trong trình soạn thảo. Có thể kéo thả file vào khu vực này.
             </p>
-            <label 
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer"
-              onDragOver={handleDragOver}
-              onDrop={handleFontDrop}
-            >
-              <Upload className="w-4 h-4" />
-              {uploadingFont ? 'Đang tải...' : 'Tải Font mới (Kéo thả)'}
-              <input type="file" accept=".ttf,.woff,.woff2,.otf" className="hidden" onChange={handleFontUpload} disabled={uploadingFont} />
-            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setGoogleFontPrompt(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                disabled={uploadingFont}
+              >
+                <Globe className="w-4 h-4" />
+                Thêm Google Font
+              </button>
+              <label 
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                {uploadingFont ? 'Đang tải...' : 'Tải Font mới'}
+                <input type="file" accept=".ttf,.woff,.woff2,.otf" className="hidden" onChange={handleFontUpload} disabled={uploadingFont} />
+              </label>
+            </div>
           </div>
           
           {fonts.length > 0 ? (
@@ -458,7 +533,7 @@ export default function AdminSettings() {
               {fonts.map(font => (
                 <div key={font.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white" style={{ fontFamily: font.name }}>{font.name}</p>
+                    <p className="font-medium text-gray-900 dark:text-white" style={{ fontFamily: `"${font.name}"` }}>{font.name}</p>
                     <p className="text-xs text-gray-500 uppercase">{font.format}</p>
                   </div>
                   <button onClick={() => handleFontDelete(font)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors">
@@ -529,6 +604,7 @@ export default function AdminSettings() {
                       <label 
                         className="flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer whitespace-nowrap transition-colors"
                         onDragOver={handleDragOver}
+                        onDragEnter={handleDragEnter}
                         onDrop={(e) => handleMascotDrop(e, action, message)}
                       >
                         {uploadingMascot === action ? 'Đang tải...' : 'Tải ảnh'}
@@ -1058,6 +1134,83 @@ export default function AdminSettings() {
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
               >
                 Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Google Font Prompt Modal */}
+      {googleFontPrompt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Thêm Google Font</h3>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tên Font (Font Family)</label>
+                <input
+                  type="text"
+                  value={googleFontData.name}
+                  onChange={(e) => setGoogleFontData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ví dụ: Roboto"
+                  className="w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL CSS của Google Font</label>
+                <input
+                  type="text"
+                  value={googleFontData.url}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    let extractedName = googleFontData.name;
+                    
+                    let tempUrl = val;
+                    if (tempUrl.includes('<link')) {
+                      const matches = Array.from(tempUrl.matchAll(/href=["'](.*?)["']/g));
+                      const cssMatch = matches.find(m => m[1].includes('fonts.googleapis.com/css'));
+                      if (cssMatch) {
+                        tempUrl = cssMatch[1];
+                      }
+                    }
+                    
+                    if (!extractedName && tempUrl.includes('family=')) {
+                      const familyMatch = tempUrl.match(/[?&]family=([^:&]+)/);
+                      if (familyMatch && familyMatch[1]) {
+                        extractedName = familyMatch[1].replace(/\+/g, ' ');
+                      }
+                    }
+                    
+                    setGoogleFontData({ name: extractedName, url: val });
+                  }}
+                  placeholder="Ví dụ: https://fonts.googleapis.com/css2?family=Roboto&display=swap"
+                  className="w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddGoogleFont();
+                    }
+                  }}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Sao chép link từ thẻ &lt;link href="..."&gt; trên trang Google Fonts.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setGoogleFontPrompt(false);
+                  setGoogleFontData({ name: '', url: '' });
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleAddGoogleFont}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+              >
+                Thêm Font
               </button>
             </div>
           </div>
