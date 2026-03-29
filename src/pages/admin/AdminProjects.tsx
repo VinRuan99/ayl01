@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useStore } from '../../store/useStore';
-import { Plus, Edit, Trash2, Globe, X, GripVertical, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Globe, X, GripVertical, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { translateText } from '../../lib/translate';
 import BlockEditor from '../../components/BlockEditor';
 import BlockRenderer from '../../components/BlockRenderer';
@@ -49,6 +49,7 @@ export default function AdminProjects() {
   const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [messageAlert, setMessageAlert] = useState<{title: string, message: string} | null>(null);
+  const [showBasicInfo, setShowBasicInfo] = useState(false);
 
   const fetchProjects = async () => {
     const q = query(collection(db, 'projects'));
@@ -74,6 +75,7 @@ export default function AdminProjects() {
       location: {},
       price: 0,
       area: 0,
+      hideDetails: true,
       type: 'Căn hộ',
       images: [],
     });
@@ -385,136 +387,177 @@ export default function AdminProjects() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Quy mô đầu tư (VNĐ)</label>
-              <input
-                type="number"
-                value={currentProject.price || 0}
-                onChange={(e) => setCurrentProject({ ...currentProject, price: Number(e.target.value) })}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Diện tích (m2)</label>
-                <label className="flex items-center text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              Thông tin cơ bản
+            </h3>
+            <button 
+              type="button" 
+              onClick={() => setShowBasicInfo(!showBasicInfo)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 rounded-md transition-colors"
+            >
+              {showBasicInfo ? (
+                <>
+                  <ChevronUp className="w-4 h-4" />
+                  Thu gọn để soạn thảo
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4" />
+                  Mở rộng thông tin
+                </>
+              )}
+            </button>
+          </div>
+
+          {showBasicInfo && (
+            <>
+              <div className="mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+                <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={currentProject.hideArea || false}
-                    onChange={(e) => setCurrentProject({ ...currentProject, hideArea: e.target.checked })}
-                    className="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={currentProject.hideDetails || false}
+                    onChange={(e) => setCurrentProject({ ...currentProject, hideDetails: e.target.checked })}
+                    className="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                   />
-                  Ẩn
+                  Ẩn bảng "Thông tin chi tiết" (Giá, Diện tích, Loại hình, Vị trí) trên trang dự án
                 </label>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-6">
+                  Khi chọn tùy chọn này, bảng thông tin ở cột bên phải trên trang chi tiết dự án sẽ bị ẩn đi.
+                </p>
               </div>
-              <input
-                type="text"
-                value={currentProject.area || ''}
-                onChange={(e) => setCurrentProject({ ...currentProject, area: e.target.value })}
-                placeholder="VD: 205 - 300"
-                disabled={currentProject.hideArea}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Loại hình</label>
-              <select
-                value={currentProject.type || 'Căn hộ'}
-                onChange={(e) => setCurrentProject({ ...currentProject, type: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-              >
-                <option value="Căn hộ">Căn hộ</option>
-                <option value="Biệt thự">Biệt thự</option>
-                <option value="Đất nền">Đất nền</option>
-                <option value="Nhà phố">Nhà phố</option>
-                {settings?.customProjectTypes?.map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-                {currentProject.type && 
-                 !['Căn hộ', 'Biệt thự', 'Đất nền', 'Nhà phố'].includes(currentProject.type) && 
-                 !(settings?.customProjectTypes || []).includes(currentProject.type) && (
-                  <option value={currentProject.type}>{currentProject.type}</option>
-                )}
-              </select>
-            </div>
-            <div className="md:col-span-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Hình ảnh dự án</label>
-              <div className="space-y-4">
-                <div 
-                  className="flex flex-col sm:flex-row items-center gap-4 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  onDragOver={handleDragOver}
-                  onDrop={handleImageDrop}
-                >
-                  <label className="flex-shrink-0 cursor-pointer">
-                    <span className="px-4 py-2 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors inline-block">
-                      {loading ? 'Đang tải...' : 'Chọn ảnh hoặc Kéo thả vào đây'}
-                    </span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Quy mô đầu tư (VNĐ)</label>
+                  <input
+                    type="number"
+                    value={currentProject.price || 0}
+                    onChange={(e) => setCurrentProject({ ...currentProject, price: Number(e.target.value) })}
+                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                  />
+                </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Diện tích (m2)</label>
+                  <label className="flex items-center text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
                     <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={loading}
+                      type="checkbox"
+                      checked={currentProject.hideArea || false}
+                      onChange={(e) => setCurrentProject({ ...currentProject, hideArea: e.target.checked })}
+                      className="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
+                    Ẩn
                   </label>
-                  <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">hoặc nhập URL:</span>
-                  <div className="flex w-full gap-2">
-                    <input
-                      type="text"
-                      id="imageUrlInput"
-                      placeholder="https://example.com/image.jpg"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const url = e.currentTarget.value.trim();
+                </div>
+                <input
+                  type="text"
+                  value={currentProject.area || ''}
+                  onChange={(e) => setCurrentProject({ ...currentProject, area: e.target.value })}
+                  placeholder="VD: 205 - 300"
+                  disabled={currentProject.hideArea}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Loại hình</label>
+                <select
+                  value={currentProject.type || 'Căn hộ'}
+                  onChange={(e) => setCurrentProject({ ...currentProject, type: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                >
+                  <option value="Căn hộ">Căn hộ</option>
+                  <option value="Biệt thự">Biệt thự</option>
+                  <option value="Đất nền">Đất nền</option>
+                  <option value="Nhà phố">Nhà phố</option>
+                  {settings?.customProjectTypes?.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                  {currentProject.type && 
+                   !['Căn hộ', 'Biệt thự', 'Đất nền', 'Nhà phố'].includes(currentProject.type) && 
+                   !(settings?.customProjectTypes || []).includes(currentProject.type) && (
+                    <option value={currentProject.type}>{currentProject.type}</option>
+                  )}
+                </select>
+              </div>
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Hình ảnh dự án</label>
+                <div className="space-y-4">
+                  <div 
+                    className="flex flex-col sm:flex-row items-center gap-4 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    onDragOver={handleDragOver}
+                    onDrop={handleImageDrop}
+                  >
+                    <label className="flex-shrink-0 cursor-pointer">
+                      <span className="px-4 py-2 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors inline-block">
+                        {loading ? 'Đang tải...' : 'Chọn ảnh hoặc Kéo thả vào đây'}
+                      </span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={loading}
+                      />
+                    </label>
+                    <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">hoặc nhập URL:</span>
+                    <div className="flex w-full gap-2">
+                      <input
+                        type="text"
+                        id="imageUrlInput"
+                        placeholder="https://example.com/image.jpg"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const url = e.currentTarget.value.trim();
+                            if (url) {
+                              setCurrentProject(prev => ({ ...prev, images: [...(prev.images || []), url] }));
+                              e.currentTarget.value = '';
+                            }
+                          }
+                        }}
+                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const input = document.getElementById('imageUrlInput') as HTMLInputElement;
+                          const url = input?.value.trim();
                           if (url) {
                             setCurrentProject(prev => ({ ...prev, images: [...(prev.images || []), url] }));
-                            e.currentTarget.value = '';
+                            if (input) input.value = '';
                           }
-                        }
-                      }}
-                      className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const input = document.getElementById('imageUrlInput') as HTMLInputElement;
-                        const url = input?.value.trim();
-                        if (url) {
-                          setCurrentProject(prev => ({ ...prev, images: [...(prev.images || []), url] }));
-                          if (input) input.value = '';
-                        }
-                      }}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
-                    >
-                      Thêm URL
-                    </button>
+                        }}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium whitespace-nowrap"
+                      >
+                        Thêm URL
+                      </button>
+                    </div>
                   </div>
-                </div>
-                
-                {currentProject.images && currentProject.images.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-4">
-                    {currentProject.images.map((img, idx) => (
-                      <div key={idx} className="relative group aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                        <img src={img || undefined} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => removeImage(idx)}
-                            className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                  
+                  {currentProject.images && currentProject.images.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-4">
+                      {currentProject.images.map((img, idx) => (
+                        <div key={idx} className="relative group aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                          <img src={img || undefined} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => removeImage(idx)}
+                              className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+            </>
+          )}
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
             <div className="flex items-center justify-between mb-4">
@@ -551,24 +594,28 @@ export default function AdminProjects() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tên dự án ({activeTab})</label>
-                <input
-                  type="text"
-                  value={currentProject.title?.[activeTab] || ''}
-                  onChange={(e) => setCurrentProject({ ...currentProject, title: { ...currentProject.title, [activeTab]: e.target.value } })}
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vị trí ({activeTab})</label>
-                <input
-                  type="text"
-                  value={currentProject.location?.[activeTab] || ''}
-                  onChange={(e) => setCurrentProject({ ...currentProject, location: { ...currentProject.location, [activeTab]: e.target.value } })}
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
-                />
-              </div>
+              {showBasicInfo && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tên dự án ({activeTab})</label>
+                    <input
+                      type="text"
+                      value={currentProject.title?.[activeTab] || ''}
+                      onChange={(e) => setCurrentProject({ ...currentProject, title: { ...currentProject.title, [activeTab]: e.target.value } })}
+                      className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vị trí ({activeTab})</label>
+                    <input
+                      type="text"
+                      value={currentProject.location?.[activeTab] || ''}
+                      onChange={(e) => setCurrentProject({ ...currentProject, location: { ...currentProject.location, [activeTab]: e.target.value } })}
+                      className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white px-3 py-2 border"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mô tả chi tiết ({activeTab})</label>
                 <BlockEditor

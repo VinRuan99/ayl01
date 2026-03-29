@@ -47,6 +47,14 @@ export default function PublicLayout() {
     trackVisit();
   }, []);
 
+  if (!settings) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen relative">
       {/* Header */}

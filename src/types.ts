@@ -39,6 +39,7 @@ export interface Project {
   price: number;
   area: string | number;
   hideArea?: boolean;
+  hideDetails?: boolean;
   type: string;
   images: string[];
   createdAt: string;

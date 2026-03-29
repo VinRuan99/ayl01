@@ -100,11 +100,8 @@ export default function ProjectDetail() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-12">
+          <div className={`${project.hideDetails ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-12`}>
             <div className="prose prose-lg prose-indigo dark:prose-invert max-w-none">
-              <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
-                {currentLanguage === 'vi' ? 'Tổng quan dự án' : 'Project Overview'}
-              </h3>
               <BlockRenderer blocks={getLocalizedBlocks(project.description)} />
             </div>
 
@@ -130,11 +127,12 @@ export default function ProjectDetail() {
           </div>
 
           {/* Sidebar Info */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 sticky top-24 border border-gray-100 dark:border-gray-700">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
-                {currentLanguage === 'vi' ? 'Thông tin chi tiết' : 'Project Details'}
-              </h3>
+          {!project.hideDetails && (
+            <div className="lg:col-span-1">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 sticky top-24 border border-gray-100 dark:border-gray-700">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+                  {currentLanguage === 'vi' ? 'Thông tin chi tiết' : 'Project Details'}
+                </h3>
               
               <div className="space-y-6 mb-8">
                 {!project.hideArea && (
@@ -199,6 +197,7 @@ export default function ProjectDetail() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
